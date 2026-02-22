@@ -110,5 +110,7 @@ extern "C" void OnModLoad()
     else if(std::isprint(sep[0])) separator = sep[0];
 
     const char* cSep = cfg->GetString("CentSeparator", ",", "Configs");
-    if(std::isprint(cSep[0])) centSeparator = cSep[0];
+    if(strcasecmp(cSep, "space") == 0) centSeparator = ' ';
+    else if(std::isprint(cSep[0])) centSeparator = cSep[0];
 }
+
