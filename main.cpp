@@ -10,12 +10,21 @@ MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.2, KillerSA)
 char separator = '.';
 char centSeparator = ',';
 int displayMode = 1;
+
 static std::string AddSeparators(std::string aValue) 
 {
     if (aValue.empty()) return aValue;
+    bool isNegative = false;
+    if (aValue[0] == '-') {
+        isNegative = true;
+        aValue.erase(0, 1);
+    }
 
-    bool isNegative = (aValue[0] == '-');
-    if (isNegative) aValue.erase(0, 1);
+    bool hasDollar = false;
+    if (!aValue.empty() && aValue[0] == '$') {
+        hasDollar = true;
+        aValue.erase(0, 1);
+    }
 
     if (displayMode == 1) 
     {
@@ -27,8 +36,9 @@ static std::string AddSeparators(std::string aValue)
             size += 4;
             len += 1;
         }
-        
+        if (hasDollar) aValue.insert(0, "$");
         if (isNegative) aValue.insert(0, "-");
+        
         return aValue;
     } 
     else if (displayMode == 2) 
@@ -36,6 +46,7 @@ static std::string AddSeparators(std::string aValue)
         while (aValue.length() < 3) {
             aValue.insert(0, "0"); 
         }
+
         std::string cents = aValue.substr(aValue.length() - 2);
         std::string dollars = aValue.substr(0, aValue.length() - 2);
 
@@ -48,8 +59,9 @@ static std::string AddSeparators(std::string aValue)
             len += 1;
         }
 
-        std::string result = "$" + dollars + centSeparator + cents;
+        std::string result = dollars + centSeparator + cents;
         
+        if (hasDollar) result = "$" + result;
         if (isNegative) result = "-" + result; 
         
         return result;
