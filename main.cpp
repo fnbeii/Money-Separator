@@ -8,20 +8,55 @@
 MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.2, KillerSA)
 
 char separator = '.';
+char centSeparator = ',';
+int displayMode = 1;
 
 static std::string AddSeparators(std::string aValue) 
 {
-    int len = aValue.length();
-    int value = (len > 0 && (aValue[0] == '-')) ? 2 : 1;
-    int size = 3;
+    if (aValue.empty()) return aValue;
 
-    while ((len - value) > size)
+    bool isNegative = (aValue[0] == '-');
+    if (isNegative) aValue.erase(0, 1);
+
+    if (displayMode == 1) 
     {
-        aValue.insert(len - size, 1, separator);
+        int len = aValue.length();
+        int size = 3;
+        while (len > size)
+        {
+            aValue.insert(len - size, 1, separator);
+            size += 4;
+            len += 1;
+        }
+        
+        if (isNegative) aValue.insert(0, "-");
+        return aValue;
+    } 
+    else if (displayMode == 2) 
+    {
+        while (aValue.length() < 3) {
+            aValue.insert(0, "0"); 
+        }
 
-        size += 4;
-        len += 1;
+        std::string cents = aValue.substr(aValue.length() - 2);
+        std::string dollars = aValue.substr(0, aValue.length() - 2);
+
+        int len = dollars.length();
+        int size = 3;
+        while (len > size)
+        {
+            dollars.insert(len - size, 1, separator);
+            size += 4;
+            len += 1;
+        }
+
+        std::string result = "$" + dollars + centSeparator + cents;
+        
+        if (isNegative) result = "-" + result; 
+        
+        return result;
     }
+
     return aValue;
 }
 
@@ -58,7 +93,12 @@ extern "C" void OnModLoad()
         }
     }
 
+    displayMode = cfg->GetInt("Mode", 1, "Configs");
+    
     const char* sep = cfg->GetString("Separator", ".", "Configs");
     if(strcasecmp(sep, "space") == 0) separator = ' ';
     else if(std::isprint(sep[0])) separator = sep[0];
+
+    const char* cSep = cfg->GetString("CentSeparator", ",", "Configs");
+    if(std::isprint(cSep[0])) centSeparator = cSep[0];
 }
