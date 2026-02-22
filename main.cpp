@@ -10,7 +10,6 @@ MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.2, KillerSA)
 char separator = '.';
 char centSeparator = ',';
 int displayMode = 1;
-
 static std::string AddSeparators(std::string aValue) 
 {
     if (aValue.empty()) return aValue;
@@ -37,7 +36,6 @@ static std::string AddSeparators(std::string aValue)
         while (aValue.length() < 3) {
             aValue.insert(0, "0"); 
         }
-
         std::string cents = aValue.substr(aValue.length() - 2);
         std::string dollars = aValue.substr(0, aValue.length() - 2);
 
