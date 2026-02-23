@@ -2,18 +2,19 @@
 #include <mod/amlmod.h>
 #include <mod/config.h>
 #include <mod/logger.h>
-#include <cctype>
 #include <string>
+#include <cctype>
 
-MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.2, KillerSA)
+MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.3, KillerSA)
 
-char separator = '.';
-char centSeparator = ',';
+std::string separator = ". ";
+std::string centSeparator = ", ";
 int displayMode = 1;
 
 static std::string AddSeparators(std::string aValue) 
 {
     if (aValue.empty()) return aValue;
+
     bool isNegative = false;
     if (aValue[0] == '-') {
         isNegative = true;
@@ -32,10 +33,11 @@ static std::string AddSeparators(std::string aValue)
         int size = 3;
         while (len > size)
         {
-            aValue.insert(len - size, 1, separator);
-            size += 4;
-            len += 1;
+            aValue.insert(len - size, separator);
+            size += 3 + separator.length(); 
+            len += separator.length();
         }
+        
         if (hasDollar) aValue.insert(0, "$");
         if (isNegative) aValue.insert(0, "-");
         
@@ -54,9 +56,9 @@ static std::string AddSeparators(std::string aValue)
         int size = 3;
         while (len > size)
         {
-            dollars.insert(len - size, 1, separator);
-            size += 4;
-            len += 1;
+            dollars.insert(len - size, separator);
+            size += 3 + separator.length();
+            len += separator.length();
         }
 
         std::string result = dollars + centSeparator + cents;
@@ -74,7 +76,6 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
 {
     std::string source = std::string { aSource };
     std::string sep = AddSeparators(source);
-    
     Money_AsciiToGxtChar(sep.c_str(), aTarget);
 }
 
@@ -106,11 +107,18 @@ extern "C" void OnModLoad()
     displayMode = cfg->GetInt("Mode", 1, "Configs");
     
     const char* sep = cfg->GetString("Separator", ".", "Configs");
-    if(strcasecmp(sep, "space") == 0) separator = ' ';
-    else if(std::isprint(sep[0])) separator = sep[0];
+    char tempSep = '.';
+    if(strcasecmp(sep, "space") == 0) tempSep = ' ';
+    else if(std::isprint(sep[0])) tempSep = sep[0];
+    
+    if (tempSep == ' ') separator = " ";
+    else separator = std::string(1, tempSep) + " ";
 
     const char* cSep = cfg->GetString("CentSeparator", ",", "Configs");
-    if(strcasecmp(cSep, "space") == 0) centSeparator = ' ';
-    else if(std::isprint(cSep[0])) centSeparator = cSep[0];
-}
+    char tempCent = ',';
+    if(strcasecmp(cSep, "space") == 0) tempCent = ' ';
+    else if(std::isprint(cSep[0])) tempCent = cSep[0];
 
+    if (tempCent == ' ') centSeparator = " ";
+    else centSeparator = std::string(1, tempCent) + " ";
+}
