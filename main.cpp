@@ -6,8 +6,8 @@
 
 MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.5, KillerSA)
 
-std::string separator = ". ";
-std::string centSeparator = ", ";
+std::string separator = ".";
+std::string centSeparator = ",";
 int displayMode = 1;
 
 static std::string AddSeparators(std::string aValue) 
@@ -111,27 +111,28 @@ extern "C" void OnModLoad()
     
     switch (displayMode) {
         case 1:
-            separator = ". ";
+            separator = ".";
             break;
         case 2:
-            separator = ", ";         
-            centSeparator = ". ";
+            separator = ",";         
+            centSeparator = ".";
             break;
         case 3:
-            separator = ". ";         
-            centSeparator = ", ";
+            separator = ".";         
+            centSeparator = ",";
             break;
         case 4:
-            separator = ". ";         
-            centSeparator = ". ";
+            separator = ".";         
+            centSeparator = ".";
             break;
         case 5:
-            separator = ", ";         
-            centSeparator = ", ";
+            separator = ",";         
+            centSeparator = ",";
             break;
         default:
             displayMode = 1;
-            separator = ". ";
+            separator = ".";
             break;
     }
 }
+
