@@ -4,7 +4,7 @@
 #include <mod/logger.h>
 #include <string>
 
-MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.4, KillerSA)
+MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.5, KillerSA)
 
 std::string separator = ". ";
 std::string centSeparator = ", ";
@@ -42,7 +42,7 @@ static std::string AddSeparators(std::string aValue)
         
         return aValue;
     } 
-    else if (displayMode == 2 || displayMode == 3) 
+    else if (displayMode >= 2 && displayMode <= 5) 
     {
         while (aValue.length() < 3) {
             aValue.insert(0, "0"); 
@@ -73,8 +73,12 @@ static std::string AddSeparators(std::string aValue)
 
 DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
 {
-    std::string source = std::string { aSource };
-    std::string sep = AddSeparators(source);
+    if (displayMode == 0) {
+        Money_AsciiToGxtChar(aSource, aTarget);
+        return;
+    }
+
+    std::string sep = AddSeparators(std::string(aSource));
     Money_AsciiToGxtChar(sep.c_str(), aTarget);
 }
 
@@ -102,15 +106,32 @@ extern "C" void OnModLoad()
             return;
         }
     }
-    displayMode = cfg->GetInt("Mode", 1, "Configs");
+
+    displayMode = cfg->Bind("Mode", 1, "Configs")->GetInt();
     
-    if (displayMode == 1) {
-        separator = ". ";
-    } else if (displayMode == 2) {
-        separator = ", ";
-        centSeparator = ". ";
-    } else if (displayMode == 3) {
-        separator = ". ";
-        centSeparator = ", ";
+    switch (displayMode) {
+        case 1:
+            separator = ". ";
+            break;
+        case 2:
+            separator = ", ";         
+            centSeparator = ". ";
+            break;
+        case 3:
+            separator = ". ";         
+            centSeparator = ", ";
+            break;
+        case 4:
+            separator = ". ";         
+            centSeparator = ". ";
+            break;
+        case 5:
+            separator = ", ";         
+            centSeparator = ", ";
+            break;
+        default:
+            displayMode = 1;
+            separator = ". ";
+            break;
     }
 }
