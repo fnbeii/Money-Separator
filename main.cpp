@@ -3,9 +3,8 @@
 #include <mod/config.h>
 #include <mod/logger.h>
 #include <string>
-#include <cctype>
 
-MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.3, KillerSA)
+MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.4, KillerSA)
 
 std::string separator = ". ";
 std::string centSeparator = ", ";
@@ -13,7 +12,7 @@ int displayMode = 1;
 
 static std::string AddSeparators(std::string aValue) 
 {
-    if (aValue.empty()) return aValue;
+    if (displayMode == 0 || aValue.empty()) return aValue;
 
     bool isNegative = false;
     if (aValue[0] == '-') {
@@ -43,7 +42,7 @@ static std::string AddSeparators(std::string aValue)
         
         return aValue;
     } 
-    else if (displayMode == 2) 
+    else if (displayMode == 2 || displayMode == 3) 
     {
         while (aValue.length() < 3) {
             aValue.insert(0, "0"); 
@@ -103,22 +102,15 @@ extern "C" void OnModLoad()
             return;
         }
     }
-
     displayMode = cfg->GetInt("Mode", 1, "Configs");
     
-    const char* sep = cfg->GetString("Separator", ".", "Configs");
-    char tempSep = '.';
-    if(strcasecmp(sep, "space") == 0) tempSep = ' ';
-    else if(std::isprint(sep[0])) tempSep = sep[0];
-    
-    if (tempSep == ' ') separator = " ";
-    else separator = std::string(1, tempSep) + " ";
-
-    const char* cSep = cfg->GetString("CentSeparator", ",", "Configs");
-    char tempCent = ',';
-    if(strcasecmp(cSep, "space") == 0) tempCent = ' ';
-    else if(std::isprint(cSep[0])) tempCent = cSep[0];
-
-    if (tempCent == ' ') centSeparator = " ";
-    else centSeparator = std::string(1, tempCent) + " ";
+    if (displayMode == 1) {
+        separator = ". ";
+    } else if (displayMode == 2) {
+        separator = ", ";
+        centSeparator = ". ";
+    } else if (displayMode == 3) {
+        separator = ". ";
+        centSeparator = ", ";
+    }
 }
