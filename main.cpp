@@ -8,6 +8,7 @@ MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.5, KillerSA)
 
 std::string separator = ".";
 std::string centSeparator = ",";
+std::string moneyColor = ""; // Tambahan variabel untuk menyimpan tag warna
 int displayMode = 1;
 
 static std::string AddSeparators(std::string aValue) 
@@ -26,6 +27,9 @@ static std::string AddSeparators(std::string aValue)
         aValue.erase(0, 1);
     }
 
+    std::string result = "";
+
+    // Logika Pemisahan Angka
     if (displayMode == 1) 
     {
         int len = aValue.length();
@@ -36,11 +40,7 @@ static std::string AddSeparators(std::string aValue)
             size += 3 + separator.length(); 
             len += separator.length();
         }
-        
-        if (hasDollar) aValue.insert(0, "$");
-        if (isNegative) aValue.insert(0, "-");
-        
-        return aValue;
+        result = aValue;
     } 
     else if (displayMode >= 2 && displayMode <= 5) 
     {
@@ -60,15 +60,19 @@ static std::string AddSeparators(std::string aValue)
             len += separator.length();
         }
 
-        std::string result = dollars + centSeparator + cents;
-        
-        if (hasDollar) result = "$" + result;
-        if (isNegative) result = "-" + result; 
-        
-        return result;
+        result = dollars + centSeparator + cents;
     }
 
-    return aValue;
+    // Mengembalikan simbol minus dan dolar
+    if (hasDollar) result = "$" + result;
+    if (isNegative) result = "-" + result; 
+    
+    // INJEKSI WARNA: Menambahkan tag warna GXT di paling depan string
+    if (!moneyColor.empty()) {
+        result = moneyColor + result;
+    }
+    
+    return result;
 }
 
 DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
@@ -109,6 +113,13 @@ extern "C" void OnModLoad()
 
     displayMode = cfg->Bind("Mode", 1, "Configs")->GetInt();
     
+    // MEMBACA WARNA DARI CONFIGURATION
+    // Pengguna bisa mengetikkan "g" (hijau), "y" (kuning), "w" (putih), "r" (merah) di file .ini
+    std::string cfgColor = cfg->Bind("Color", "", "Configs")->GetString();
+    if (!cfgColor.empty()) {
+        moneyColor = "~" + cfgColor + "~";
+    }
+    
     switch (displayMode) {
         case 1:
             separator = ".";
@@ -135,4 +146,3 @@ extern "C" void OnModLoad()
             break;
     }
 }
-
