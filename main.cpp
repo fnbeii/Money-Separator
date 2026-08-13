@@ -1,22 +1,29 @@
+// A port from PC to Android (https://github.com/The-Musaigen/money-separator) | thanks for RusJJ
 #include <mod/amlmod.h>
 #include <mod/config.h>
 #include <mod/logger.h>
 #include <string>
+#include <stdint.h> // Tambahan untuk mengatasi error uintptr_t / uint8_t
 
-MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.7, KillerSA)
+MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.8, KillerSA)
 
 std::string separator = ".";
 std::string centSeparator = ",";
 int displayMode = 1;
 
+// === VARIABEL RGB CUSTOM ===
 bool useCustomRGB = false;
-int rPlus = 50, gPlus = 255, bPlus = 50;
-int rMinus = 255, gMinus = 50, bMinus = 50;
+int rPlus = 50, gPlus = 255, bPlus = 50;    // Default: Hijau Uang
+int rMinus = 255, gMinus = 50, bMinus = 50; // Default: Merah Minus
 
+// Struktur memori warna bawaan game
 struct CRGBA {
     uint8_t r, g, b, a;
 };
 
+// ==========================================
+// MESIN 1: PEMISAH ANGKA (Teks Murni)
+// ==========================================
 static std::string AddSeparators(std::string aValue) 
 {
     if (displayMode == 0 || aValue.empty()) return aValue;
@@ -83,16 +90,22 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
     Money_AsciiToGxtChar(sep.c_str(), aTarget);
 }
 
+// ==========================================
+// MESIN 2: PEMBAJAK RGB LANGSUNG KE MEMORI
+// ==========================================
 DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t alpha)
 {
+    // Biarkan game mengambil warna aslinya terlebih dahulu
     CHudColours_GetRGB(out, self, colorIndex, alpha);
+    
+    // Cegat dan timpa dengan warna kita!
     if (useCustomRGB) {
-        if (colorIndex == 1) {
+        if (colorIndex == 1) {        // Index 1 = Uang Positif
             out->r = rPlus;
             out->g = gPlus;
             out->b = bPlus;
         }
-        else if (colorIndex == 0) {
+        else if (colorIndex == 0) {   // Index 0 = Uang Minus/Merah (Juga dipakai untuk hal lain)
             out->r = rMinus;
             out->g = gMinus;
             out->b = bMinus;
@@ -109,21 +122,28 @@ extern "C" void OnModLoad()
     uintptr_t pGame = aml->GetLib("libGTASA.so");
     if(pGame)
     {
+        // 1. Hook Pemisah Uang
         HOOKBLX(Money_AsciiToGxtChar, pGame + BYBIT(0x2BD26E + 0x1, 0x37D4C4));
-        uintptr_t pGetRGB = aml->GetSym(pGame, "_ZN11CHudColours6GetRGBEih");
-        if (pGetRGB) {
-            HOOK(CHudColours_GetRGB, pGetRGB);
-        } else {
-            uintptr_t pGetRGBA = aml->GetSym(pGame, "_ZN11CHudColours7GetRGBAEih");
-            if (pGetRGBA) HOOK(CHudColours_GetRGB, pGetRGBA);
-        }
+        
+        // 2. Hook Mesin Warna RGB Dinamis (Hardcoded Offset v2.00 dari Python)
+        HOOK(CHudColours_GetRGB, pGame + 0x43AB0C + 0x1);
     }
     else
     {
-        logger->Error("This game is unsupported");
-        return;
+        pGame = aml->GetLib("libGTAVC.so");
+        if(pGame)
+        {
+            // Fallback untuk GTA VC jika ada
+            HOOKBL(Money_AsciiToGxtChar, pGame + BYBIT(0x1E9F74 + 0x1, 0x2C3AC8));
+        }
+        else
+        {
+            logger->Error("This game is unsupported");
+            return;
+        }
     }
 
+    // === MEMBACA CONFIGS ===
     displayMode = cfg->Bind("Mode", 1, "Configs")->GetInt();
     
     useCustomRGB = cfg->Bind("UseCustomRGB", false, "Colors")->GetBool();
