@@ -1,45 +1,42 @@
-// A port from PC to Android (https://github.com/The-Musaigen/money-separator) | thanks for RusJJ
 #include <mod/amlmod.h>
 #include <mod/config.h>
 #include <mod/logger.h>
 #include <string>
 #include <stdint.h>
 
-MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 2.1, KillerSA)
+MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 2.2, KillerSA)
 
 std::string separator = ".";
-std::string centSeparator = ",";
+std::string centSeparator = ".";
 int displayMode = 1;
 
-// === VARIABEL RGB CUSTOM ===
 bool useCustomRGB = false;
-int rPlus = 50, gPlus = 255, bPlus = 50;    // Default: Hijau Uang
-int rMinus = 255, gMinus = 50, bMinus = 50; // Default: Merah Minus
+int moneyR = 50, moneyG = 255, moneyB = 50;
 
 struct CRGBA {
     uint8_t r, g, b, a;
 };
 
-// Pointer global untuk mengakses struktur PlayerInfo
+void (*CFont_SetProportional)(unsigned char);
 void* g_pPlayerInfo = nullptr;
 
-// ==========================================
-// MESIN 1: PEMISAH ANGKA & MANIPULASI RENDER
-// ==========================================
 static std::string AddSeparators(std::string aValue) 
 {
     if (displayMode == 0 || aValue.empty()) return aValue;
 
     bool isNegative = false;
-    if (aValue[0] == '-') {
-        isNegative = true;
-        aValue.erase(0, 1);
-    }
-
     bool hasDollar = false;
-    if (!aValue.empty() && aValue[0] == '$') {
-        hasDollar = true;
-        aValue.erase(0, 1);
+
+    while (!aValue.empty()) {
+        if (aValue[0] == '$') {
+            hasDollar = true;
+            aValue.erase(0, 1);
+        } else if (aValue[0] == '-') {
+            isNegative = true;
+            aValue.erase(0, 1);
+        } else {
+            break;
+        }
     }
 
     std::string result = "";
@@ -56,7 +53,7 @@ static std::string AddSeparators(std::string aValue)
         }
         result = aValue;
     } 
-    else if (displayMode >= 2 && displayMode <= 5) 
+    else if (displayMode == 2) 
     {
         while (aValue.length() < 3) {
             aValue.insert(0, "0"); 
@@ -91,76 +88,51 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
         Money_AsciiToGxtChar(sep.c_str(), aTarget);
     }
 
-    // === FIX: BYPASS BUG UKURAN UANG MENGECIL ===
-    // Game akan mengecek "if (m_nDisplayMoney >= 10000000)" setelah fungsi ini memformat teksnya.
-    // Kita menipu gamenya dengan meng-nol-kan display money sesaat sebelum dicek,
-    // sehingga ukurannya akan selalu sama persis dan konsisten!
+    if (CFont_SetProportional) {
+        CFont_SetProportional(1); 
+    }
+
     if (g_pPlayerInfo) {
         int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
-        *m_nDisplayMoney = 0; // Ubah jadi 0 agar lolos pengecekan ukuran font Rockstar
+        *m_nDisplayMoney = 0; 
     }
 }
 
-// ==========================================
-// MESIN 2: PEMBAJAK RGB LANGSUNG KE MEMORI
-// ==========================================
 DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t alpha)
 {
     CHudColours_GetRGB(out, self, colorIndex, alpha);
-    
-    if (useCustomRGB) {
-        if (colorIndex == 1) {        
-            out->r = rPlus;
-            out->g = gPlus;
-            out->b = bPlus;
-        }
-        else if (colorIndex == 0) {   
-            out->r = rMinus;
-            out->g = gMinus;
-            out->b = bMinus;
-        }
+    if (useCustomRGB && colorIndex == 1) {        
+        out->r = moneyR;
+        out->g = moneyG;
+        out->b = moneyB;
     }
 }
 
-// ==========================================
-// MESIN 3: PENGHAPUS ANIMASI UANG (Instan)
-// ==========================================
 DECL_HOOKv(CPlayerInfo_Process, void* self, int playerIndex)
 {
-    // 1. Biarkan game memproses data player secara normal
     CPlayerInfo_Process(self, playerIndex);
-
-    // 2. Simpan alamat player untuk digunakan di trik bypass ukuran
     g_pPlayerInfo = self;
 
-    // 3. Akses memori Uang Asli (0xB8) dan Uang Layar (0xBC)
     int* m_nMoney = (int*)((uintptr_t)self + 0xB8);
     int* m_nDisplayMoney = (int*)((uintptr_t)self + 0xBC);
 
-    // 4. Paksa Uang Layar menjadi Uang Asli secara instan!
     *m_nDisplayMoney = *m_nMoney;
 }
 
-// ==========================================
-// INISIALISASI MOD
-// ==========================================
 extern "C" void OnModLoad()
 {
     logger->SetTag("Money Separator");
     cfg->Bind("Author", "", "About")->SetString("KillerSA"); cfg->ClearLast();
     cfg->Bind("GitHub", "", "About")->SetString("https://github.com/KillerSAA/Money-Separator/tree/main"); cfg->ClearLast();
+	cfg->Bind("Re-Edit", "", "About")->SetString("mnfy"); cfg->ClearLast();
     
     uintptr_t pGame = aml->GetLib("libGTASA.so");
     if(pGame)
     {
-        // 1. Hook Pemisah Uang & Manipulasi Render
         HOOKBLX(Money_AsciiToGxtChar, pGame + BYBIT(0x2BD26E + 0x1, 0x37D4C4));
-        
-        // 2. Hook Mesin Warna RGB Dinamis (Offset v2.00)
         HOOK(CHudColours_GetRGB, pGame + 0x43AB0C + 0x1);
-        
-        // 3. Hook Animasi Uang menjadi Instan (Offset v2.00)
         HOOK(CPlayerInfo_Process, pGame + 0x40908C + 0x1);
+        CFont_SetProportional = (void (*)(unsigned char))(pGame + 0x194F7C + 0x1);
     }
     else
     {
@@ -176,24 +148,10 @@ extern "C" void OnModLoad()
         }
     }
 
-    // === MEMBACA CONFIGS ===
     displayMode = cfg->Bind("Mode", 1, "Configs")->GetInt();
     
     useCustomRGB = cfg->Bind("UseCustomRGB", false, "Colors")->GetBool();
-    rPlus = cfg->Bind("R_Plus", 50, "Colors")->GetInt();
-    gPlus = cfg->Bind("G_Plus", 255, "Colors")->GetInt();
-    bPlus = cfg->Bind("B_Plus", 50, "Colors")->GetInt();
-    
-    rMinus = cfg->Bind("R_Minus", 255, "Colors")->GetInt();
-    gMinus = cfg->Bind("G_Minus", 50, "Colors")->GetInt();
-    bMinus = cfg->Bind("B_Minus", 50, "Colors")->GetInt();
-    
-    switch (displayMode) {
-        case 1: separator = "."; break;
-        case 2: separator = ","; centSeparator = "."; break;
-        case 3: separator = "."; centSeparator = ","; break;
-        case 4: separator = "."; centSeparator = "."; break;
-        case 5: separator = ","; centSeparator = ","; break;
-        default: displayMode = 1; separator = "."; break;
-    }
+    moneyR = cfg->Bind("moneyR", 50, "Colors")->GetInt();
+    moneyG = cfg->Bind("moneyG", 255, "Colors")->GetInt();
+    moneyB = cfg->Bind("moneyB", 50, "Colors")->GetInt();
 }
