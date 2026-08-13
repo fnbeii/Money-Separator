@@ -3,9 +3,9 @@
 #include <mod/config.h>
 #include <mod/logger.h>
 #include <string>
-#include <stdint.h> // Tambahan untuk mengatasi error uintptr_t / uint8_t
+#include <stdint.h>
 
-MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.8, KillerSA)
+MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 1.9, KillerSA)
 
 std::string separator = ".";
 std::string centSeparator = ",";
@@ -16,7 +16,6 @@ bool useCustomRGB = false;
 int rPlus = 50, gPlus = 255, bPlus = 50;    // Default: Hijau Uang
 int rMinus = 255, gMinus = 50, bMinus = 50; // Default: Merah Minus
 
-// Struktur memori warna bawaan game
 struct CRGBA {
     uint8_t r, g, b, a;
 };
@@ -95,17 +94,15 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
 // ==========================================
 DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t alpha)
 {
-    // Biarkan game mengambil warna aslinya terlebih dahulu
     CHudColours_GetRGB(out, self, colorIndex, alpha);
     
-    // Cegat dan timpa dengan warna kita!
     if (useCustomRGB) {
-        if (colorIndex == 1) {        // Index 1 = Uang Positif
+        if (colorIndex == 1) {        
             out->r = rPlus;
             out->g = gPlus;
             out->b = bPlus;
         }
-        else if (colorIndex == 0) {   // Index 0 = Uang Minus/Merah (Juga dipakai untuk hal lain)
+        else if (colorIndex == 0) {   
             out->r = rMinus;
             out->g = gMinus;
             out->b = bMinus;
@@ -113,6 +110,25 @@ DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t a
     }
 }
 
+// ==========================================
+// MESIN 3: PENGHAPUS ANIMASI UANG (Instan)
+// ==========================================
+DECL_HOOKv(CPlayerInfo_Process, void* self, int playerIndex)
+{
+    // 1. Biarkan game memproses data player lainnya secara normal
+    CPlayerInfo_Process(self, playerIndex);
+
+    // 2. Akses memori Uang Asli (0xB8) dan Uang Layar (0xBC)
+    int* m_nMoney = (int*)((uintptr_t)self + 0xB8);
+    int* m_nDisplayMoney = (int*)((uintptr_t)self + 0xBC);
+
+    // 3. Paksa Uang Layar menjadi Uang Asli secara instan!
+    *m_nDisplayMoney = *m_nMoney;
+}
+
+// ==========================================
+// INISIALISASI MOD
+// ==========================================
 extern "C" void OnModLoad()
 {
     logger->SetTag("Money Separator");
@@ -125,15 +141,17 @@ extern "C" void OnModLoad()
         // 1. Hook Pemisah Uang
         HOOKBLX(Money_AsciiToGxtChar, pGame + BYBIT(0x2BD26E + 0x1, 0x37D4C4));
         
-        // 2. Hook Mesin Warna RGB Dinamis (Hardcoded Offset v2.00 dari Python)
+        // 2. Hook Mesin Warna RGB Dinamis (Offset v2.00)
         HOOK(CHudColours_GetRGB, pGame + 0x43AB0C + 0x1);
+        
+        // 3. Hook Animasi Uang menjadi Instan (Offset v2.00)
+        HOOK(CPlayerInfo_Process, pGame + 0x40908C + 0x1);
     }
     else
     {
         pGame = aml->GetLib("libGTAVC.so");
         if(pGame)
         {
-            // Fallback untuk GTA VC jika ada
             HOOKBL(Money_AsciiToGxtChar, pGame + BYBIT(0x1E9F74 + 0x1, 0x2C3AC8));
         }
         else
@@ -147,7 +165,6 @@ extern "C" void OnModLoad()
     displayMode = cfg->Bind("Mode", 1, "Configs")->GetInt();
     
     useCustomRGB = cfg->Bind("UseCustomRGB", false, "Colors")->GetBool();
-    
     rPlus = cfg->Bind("R_Plus", 50, "Colors")->GetInt();
     gPlus = cfg->Bind("G_Plus", 255, "Colors")->GetInt();
     bPlus = cfg->Bind("B_Plus", 50, "Colors")->GetInt();
