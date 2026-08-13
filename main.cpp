@@ -110,12 +110,12 @@ extern "C" void OnModLoad()
     if(pGame)
     {
         HOOKBLX(Money_AsciiToGxtChar, pGame + BYBIT(0x2BD26E + 0x1, 0x37D4C4));
-        void* pGetRGB = aml->GetSym(pGame, "_ZN11CHudColours6GetRGBEih");
+        uintptr_t pGetRGB = aml->GetSym(pGame, "_ZN11CHudColours6GetRGBEih");
         if (pGetRGB) {
-            HOOKv(CHudColours_GetRGB, pGetRGB);
+            HOOK(CHudColours_GetRGB, pGetRGB);
         } else {
-            void* pGetRGBA = aml->GetSym(pGame, "_ZN11CHudColours7GetRGBAEih");
-            if (pGetRGBA) HOOKv(CHudColours_GetRGB, pGetRGBA);
+            uintptr_t pGetRGBA = aml->GetSym(pGame, "_ZN11CHudColours7GetRGBAEih");
+            if (pGetRGBA) HOOK(CHudColours_GetRGB, pGetRGBA);
         }
     }
     else
