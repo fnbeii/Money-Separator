@@ -1,27 +1,31 @@
+// A port from PC to Android (https://github.com/The-Musaigen/money-separator) | thanks for RusJJ
 #include <mod/amlmod.h>
 #include <mod/config.h>
 #include <mod/logger.h>
 #include <string>
 #include <stdint.h>
 
-MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 2.0, KillerSA)
+MYMODCFG(net.KillerSA.moneyseparator, Money Separator, 2.1, KillerSA)
 
 std::string separator = ".";
 std::string centSeparator = ",";
 int displayMode = 1;
 
+// === VARIABEL RGB CUSTOM ===
 bool useCustomRGB = false;
-int rPlus = 50, gPlus = 255, bPlus = 50;
-int rMinus = 255, gMinus = 50, bMinus = 50;
+int rPlus = 50, gPlus = 255, bPlus = 50;    // Default: Hijau Uang
+int rMinus = 255, gMinus = 50, bMinus = 50; // Default: Merah Minus
 
 struct CRGBA {
     uint8_t r, g, b, a;
 };
 
-void (*CFont_SetProportional)(unsigned char);
-
+// Pointer global untuk mengakses struktur PlayerInfo
 void* g_pPlayerInfo = nullptr;
 
+// ==========================================
+// MESIN 1: PEMISAH ANGKA & MANIPULASI RENDER
+// ==========================================
 static std::string AddSeparators(std::string aValue) 
 {
     if (displayMode == 0 || aValue.empty()) return aValue;
@@ -87,16 +91,19 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
         Money_AsciiToGxtChar(sep.c_str(), aTarget);
     }
 
-    if (CFont_SetProportional) {
-        CFont_SetProportional(1);
-    }
-
+    // === FIX: BYPASS BUG UKURAN UANG MENGECIL ===
+    // Game akan mengecek "if (m_nDisplayMoney >= 10000000)" setelah fungsi ini memformat teksnya.
+    // Kita menipu gamenya dengan meng-nol-kan display money sesaat sebelum dicek,
+    // sehingga ukurannya akan selalu sama persis dan konsisten!
     if (g_pPlayerInfo) {
         int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
-        *m_nDisplayMoney = 0;
+        *m_nDisplayMoney = 0; // Ubah jadi 0 agar lolos pengecekan ukuran font Rockstar
     }
 }
 
+// ==========================================
+// MESIN 2: PEMBAJAK RGB LANGSUNG KE MEMORI
+// ==========================================
 DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t alpha)
 {
     CHudColours_GetRGB(out, self, colorIndex, alpha);
@@ -115,18 +122,28 @@ DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t a
     }
 }
 
+// ==========================================
+// MESIN 3: PENGHAPUS ANIMASI UANG (Instan)
+// ==========================================
 DECL_HOOKv(CPlayerInfo_Process, void* self, int playerIndex)
 {
+    // 1. Biarkan game memproses data player secara normal
     CPlayerInfo_Process(self, playerIndex);
 
+    // 2. Simpan alamat player untuk digunakan di trik bypass ukuran
     g_pPlayerInfo = self;
 
+    // 3. Akses memori Uang Asli (0xB8) dan Uang Layar (0xBC)
     int* m_nMoney = (int*)((uintptr_t)self + 0xB8);
     int* m_nDisplayMoney = (int*)((uintptr_t)self + 0xBC);
 
+    // 4. Paksa Uang Layar menjadi Uang Asli secara instan!
     *m_nDisplayMoney = *m_nMoney;
 }
 
+// ==========================================
+// INISIALISASI MOD
+// ==========================================
 extern "C" void OnModLoad()
 {
     logger->SetTag("Money Separator");
@@ -136,13 +153,14 @@ extern "C" void OnModLoad()
     uintptr_t pGame = aml->GetLib("libGTASA.so");
     if(pGame)
     {
+        // 1. Hook Pemisah Uang & Manipulasi Render
         HOOKBLX(Money_AsciiToGxtChar, pGame + BYBIT(0x2BD26E + 0x1, 0x37D4C4));
         
+        // 2. Hook Mesin Warna RGB Dinamis (Offset v2.00)
         HOOK(CHudColours_GetRGB, pGame + 0x43AB0C + 0x1);
         
+        // 3. Hook Animasi Uang menjadi Instan (Offset v2.00)
         HOOK(CPlayerInfo_Process, pGame + 0x40908C + 0x1);
-
-        CFont_SetProportional = (void (*)(unsigned char))(pGame + 0x194F7C + 0x1);
     }
     else
     {
@@ -158,6 +176,7 @@ extern "C" void OnModLoad()
         }
     }
 
+    // === MEMBACA CONFIGS ===
     displayMode = cfg->Bind("Mode", 1, "Configs")->GetInt();
     
     useCustomRGB = cfg->Bind("UseCustomRGB", false, "Colors")->GetBool();
