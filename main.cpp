@@ -86,10 +86,6 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
         Money_AsciiToGxtChar(sep.c_str(), aTarget);
     }
 
-    if (CFont_SetProportional) {
-        CFont_SetProportional(1); 
-    }
-
     if (g_pPlayerInfo) {
         int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
         *m_nDisplayMoney = 0; 
