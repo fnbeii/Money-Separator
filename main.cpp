@@ -1,10 +1,11 @@
+// A port from PC to Android (https://github.com/The-Musaigen/money-separator) | thanks for RusJJ
 #include <mod/amlmod.h>
 #include <mod/config.h>
 #include <mod/logger.h>
 #include <string>
 #include <stdint.h>
 
-MYMODCFG(net.KillerSA.mnfy.moneyseparator, Money Separator, 3.3, KillerSA)
+MYMODCFG(net.KillerSA.mnfy.moneyseparator, Money Separator, 2.3, KillerSA)
 
 std::string separator = ".";
 std::string centSeparator = ".";
@@ -18,18 +19,14 @@ struct CRGBA {
 
 void* g_pPlayerInfo = nullptr;
 
-// ==========================================
-// MESIN 1: LOGIKA PEMISAH ANGKA
-// ==========================================
 static std::string AddSeparators(std::string aValue) 
 {
     if (displayMode == 0 || aValue.empty()) return aValue;
 
     bool isNegative = false;
-    bool isPositive = false;
     bool hasDollar = false;
 
-    // Sedot simbol dari depan angka agar tidak bentrok dengan separator
+    // 1. Sedot simbol $ dan - dari depan
     while (!aValue.empty()) {
         if (aValue[0] == '$') {
             hasDollar = true;
@@ -37,16 +34,21 @@ static std::string AddSeparators(std::string aValue)
         } else if (aValue[0] == '-') {
             isNegative = true;
             aValue.erase(0, 1);
-        } else if (aValue[0] == '+') {
-            isPositive = true;
-            aValue.erase(0, 1);
         } else {
             break;
         }
     }
 
+    // 2. HAPUS ANGKA NOL DI DEPAN (Leading Zeros)
+    // Selama teks lebih dari 1 karakter dan karakter depannya '0', hapus!
+    // (Batas > 1 agar jika uangnya benar-benar "0", tidak terhapus semua)
+    while (aValue.length() > 1 && aValue[0] == '0') {
+        aValue.erase(0, 1);
+    }
+
     std::string result = "";
 
+    // MODE 1: Format Standar (Tanpa Sen)
     if (displayMode == 1) 
     {
         int len = aValue.length();
@@ -59,8 +61,10 @@ static std::string AddSeparators(std::string aValue)
         }
         result = aValue;
     } 
+    // MODE 2: Format dengan Sen
     else if (displayMode == 2) 
     {
+        // Pastikan minimal ada 3 digit (misal: "0" jadi "000" agar sen aman)
         while (aValue.length() < 3) {
             aValue.insert(0, "0"); 
         }
@@ -79,46 +83,29 @@ static std::string AddSeparators(std::string aValue)
         result = dollars + centSeparator + cents;
     }
     
-    // Kembalikan simbol ke tempat semula
+    // 3. Kembalikan simbol ke posisi semula
     if (hasDollar) result = "$" + result;
     if (isNegative) result = "-" + result; 
-    if (isPositive) result = "+" + result; 
     
     return result;
 }
 
-// ==========================================
-// MESIN 2: PEMBAJAK TEKS GLOBAL (Menangkap Semua Teks Uang)
-// ==========================================
-DECL_HOOKv(Global_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
+DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
 {
-    std::string s(aSource);
-    
-    // Deteksi jika ini adalah teks HUD Uang Utama atau teks Uang Melayang (Money Changer)
-    if ((s.length() > 0 && s[0] == '$') || (s.length() > 1 && (s[0] == '+' || s[0] == '-') && s[1] == '$')) {
-        s = AddSeparators(s);
-        Global_AsciiToGxtChar(s.c_str(), aTarget);
-    } 
-    else {
-        Global_AsciiToGxtChar(aSource, aTarget);
+    if (displayMode == 0) {
+        Money_AsciiToGxtChar(aSource, aTarget);
+    } else {
+        std::string sep = AddSeparators(std::string(aSource));
+        Money_AsciiToGxtChar(sep.c_str(), aTarget);
+    }
+
+    // Bug 10 Juta Bypass
+    if (g_pPlayerInfo) {
+        int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
+        *m_nDisplayMoney = 0; 
     }
 }
 
-// ==========================================
-// MESIN 3: PEMBLOKIR BUG 10 JUTA
-// ==========================================
-DECL_HOOKv(CFont_SetScale, float w, float h)
-{
-    // Jika game mencoba mengecilkan font sampai tidak masuk akal, kita abaikan instruksinya
-    if (h > 0.0f && h < 0.001f) {
-        return; 
-    }
-    CFont_SetScale(w, h);
-}
-
-// ==========================================
-// MESIN 4: PEMBAJAK RGB WARNA PLUS
-// ==========================================
 DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t alpha)
 {
     CHudColours_GetRGB(out, self, colorIndex, alpha);
@@ -129,42 +116,17 @@ DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t a
     }
 }
 
-// ==========================================
-// MESIN 5: TRIK ILUSI HUD (Uang Instan, Animasi Melayang Tetap Jalan)
-// ==========================================
 DECL_HOOKv(CPlayerInfo_Process, void* self, int playerIndex)
 {
     CPlayerInfo_Process(self, playerIndex);
     g_pPlayerInfo = self;
+
+    int* m_nMoney = (int*)((uintptr_t)self + 0xB8);
+    int* m_nDisplayMoney = (int*)((uintptr_t)self + 0xBC);
+
+    *m_nDisplayMoney = *m_nMoney;
 }
 
-DECL_HOOK(void*, CWidgetPlayerInfo_Draw, void* self)
-{
-    int tempDisplay = 0;
-    int* m_nDisplayMoney = nullptr;
-    
-    // Tepat sebelum HUD uang digambar, kita ubah nilai DisplayMoney jadi instan!
-    if (g_pPlayerInfo) {
-        int* m_nMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xB8);
-        m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
-        
-        tempDisplay = *m_nDisplayMoney;
-        *m_nDisplayMoney = *m_nMoney; 
-    }
-    
-    void* result = CWidgetPlayerInfo_Draw(self);
-    
-    // Setelah selesai digambar, kembalikan nilai animasi agar teks Money Changer tetap muncul
-    if (m_nDisplayMoney) {
-        *m_nDisplayMoney = tempDisplay;
-    }
-    
-    return result;
-}
-
-// ==========================================
-// INISIALISASI MOD
-// ==========================================
 extern "C" void OnModLoad()
 {
     logger->SetTag("Money Separator");
@@ -174,31 +136,16 @@ extern "C" void OnModLoad()
     uintptr_t pGame = aml->GetLib("libGTASA.so");
     if(pGame)
     {
-        uintptr_t sym_AsciiToGxtChar = aml->GetSym(pGame, "_Z14AsciiToGxtCharPKcPt");
-        uintptr_t sym_SetScale       = aml->GetSym(pGame, "_ZN5CFont8SetScaleEff");
-        
-        if (sym_AsciiToGxtChar) {
-            HOOK(Global_AsciiToGxtChar, sym_AsciiToGxtChar);
-        }
-        
-        // FIX FATAL: CFont::SetScale dikompilasi sebagai ARM murni (32-bit), TANPA + 0x1
-        if (sym_SetScale) {
-            HOOK(CFont_SetScale, sym_SetScale);
-        } else {
-            HOOK(CFont_SetScale, pGame + 0x190E6C); 
-        }
-        
+        HOOKBLX(Money_AsciiToGxtChar, pGame + BYBIT(0x2BD26E + 0x1, 0x37D4C4));
         HOOK(CHudColours_GetRGB, pGame + 0x43AB0C + 0x1);
         HOOK(CPlayerInfo_Process, pGame + 0x40908C + 0x1);
-        HOOK(CWidgetPlayerInfo_Draw, pGame + 0x2BCC88 + 0x1);
     }
     else
     {
         pGame = aml->GetLib("libGTAVC.so");
         if(pGame)
         {
-            uintptr_t sym_AsciiToGxtChar = aml->GetSym(pGame, "_Z14AsciiToGxtCharPKcPt");
-            if (sym_AsciiToGxtChar) HOOK(Global_AsciiToGxtChar, sym_AsciiToGxtChar);
+            HOOKBL(Money_AsciiToGxtChar, pGame + BYBIT(0x1E9F74 + 0x1, 0x2C3AC8));
         }
         else
         {
