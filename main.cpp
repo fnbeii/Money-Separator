@@ -1,4 +1,3 @@
-// A port from PC to Android (https://github.com/The-Musaigen/money-separator) | thanks for RusJJ
 #include <mod/amlmod.h>
 #include <mod/config.h>
 #include <mod/logger.h>
@@ -26,7 +25,6 @@ static std::string AddSeparators(std::string aValue)
     bool isNegative = false;
     bool hasDollar = false;
 
-    // 1. Sedot simbol $ dan - dari depan
     while (!aValue.empty()) {
         if (aValue[0] == '$') {
             hasDollar = true;
@@ -39,16 +37,11 @@ static std::string AddSeparators(std::string aValue)
         }
     }
 
-    // 2. HAPUS ANGKA NOL DI DEPAN (Leading Zeros)
-    // Selama teks lebih dari 1 karakter dan karakter depannya '0', hapus!
-    // (Batas > 1 agar jika uangnya benar-benar "0", tidak terhapus semua)
     while (aValue.length() > 1 && aValue[0] == '0') {
         aValue.erase(0, 1);
     }
 
     std::string result = "";
-
-    // MODE 1: Format Standar (Tanpa Sen)
     if (displayMode == 1) 
     {
         int len = aValue.length();
@@ -60,11 +53,9 @@ static std::string AddSeparators(std::string aValue)
             len += separator.length();
         }
         result = aValue;
-    } 
-    // MODE 2: Format dengan Sen
+    }
     else if (displayMode == 2) 
     {
-        // Pastikan minimal ada 3 digit (misal: "0" jadi "000" agar sen aman)
         while (aValue.length() < 3) {
             aValue.insert(0, "0"); 
         }
@@ -83,7 +74,6 @@ static std::string AddSeparators(std::string aValue)
         result = dollars + centSeparator + cents;
     }
     
-    // 3. Kembalikan simbol ke posisi semula
     if (hasDollar) result = "$" + result;
     if (isNegative) result = "-" + result; 
     
@@ -99,7 +89,6 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
         Money_AsciiToGxtChar(sep.c_str(), aTarget);
     }
 
-    // Bug 10 Juta Bypass
     if (g_pPlayerInfo) {
         int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
         *m_nDisplayMoney = 0; 
@@ -132,6 +121,7 @@ extern "C" void OnModLoad()
     logger->SetTag("Money Separator");
     cfg->Bind("Author", "", "About")->SetString("KillerSA"); cfg->ClearLast();
     cfg->Bind("GitHub", "", "About")->SetString("https://github.com/KillerSAA/Money-Separator/tree/main"); cfg->ClearLast();
+	cfg->Bind("Re-Edit", "", "About")->SetString("mnfy"); cfg->ClearLast();
     
     uintptr_t pGame = aml->GetLib("libGTASA.so");
     if(pGame)
