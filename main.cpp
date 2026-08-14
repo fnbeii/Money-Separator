@@ -4,7 +4,7 @@
 #include <string>
 #include <stdint.h>
 
-MYMODCFG(net.KillerSA.mnfy.moneyseparator, Money Separator, 3.2, KillerSA)
+MYMODCFG(net.KillerSA.mnfy.moneyseparator, Money Separator, 3.3, KillerSA)
 
 std::string separator = ".";
 std::string centSeparator = ".";
@@ -18,6 +18,9 @@ struct CRGBA {
 
 void* g_pPlayerInfo = nullptr;
 
+// ==========================================
+// MESIN 1: LOGIKA PEMISAH ANGKA
+// ==========================================
 static std::string AddSeparators(std::string aValue) 
 {
     if (displayMode == 0 || aValue.empty()) return aValue;
@@ -26,6 +29,7 @@ static std::string AddSeparators(std::string aValue)
     bool isPositive = false;
     bool hasDollar = false;
 
+    // Sedot simbol dari depan angka agar tidak bentrok dengan separator
     while (!aValue.empty()) {
         if (aValue[0] == '$') {
             hasDollar = true;
@@ -75,6 +79,7 @@ static std::string AddSeparators(std::string aValue)
         result = dollars + centSeparator + cents;
     }
     
+    // Kembalikan simbol ke tempat semula
     if (hasDollar) result = "$" + result;
     if (isNegative) result = "-" + result; 
     if (isPositive) result = "+" + result; 
@@ -82,10 +87,14 @@ static std::string AddSeparators(std::string aValue)
     return result;
 }
 
+// ==========================================
+// MESIN 2: PEMBAJAK TEKS GLOBAL (Menangkap Semua Teks Uang)
+// ==========================================
 DECL_HOOKv(Global_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
 {
     std::string s(aSource);
     
+    // Deteksi jika ini adalah teks HUD Uang Utama atau teks Uang Melayang (Money Changer)
     if ((s.length() > 0 && s[0] == '$') || (s.length() > 1 && (s[0] == '+' || s[0] == '-') && s[1] == '$')) {
         s = AddSeparators(s);
         Global_AsciiToGxtChar(s.c_str(), aTarget);
@@ -95,14 +104,21 @@ DECL_HOOKv(Global_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
     }
 }
 
+// ==========================================
+// MESIN 3: PEMBLOKIR BUG 10 JUTA
+// ==========================================
 DECL_HOOKv(CFont_SetScale, float w, float h)
 {
+    // Jika game mencoba mengecilkan font sampai tidak masuk akal, kita abaikan instruksinya
     if (h > 0.0f && h < 0.001f) {
         return; 
     }
     CFont_SetScale(w, h);
 }
 
+// ==========================================
+// MESIN 4: PEMBAJAK RGB WARNA PLUS
+// ==========================================
 DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t alpha)
 {
     CHudColours_GetRGB(out, self, colorIndex, alpha);
@@ -113,6 +129,9 @@ DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t a
     }
 }
 
+// ==========================================
+// MESIN 5: TRIK ILUSI HUD (Uang Instan, Animasi Melayang Tetap Jalan)
+// ==========================================
 DECL_HOOKv(CPlayerInfo_Process, void* self, int playerIndex)
 {
     CPlayerInfo_Process(self, playerIndex);
@@ -123,6 +142,8 @@ DECL_HOOK(void*, CWidgetPlayerInfo_Draw, void* self)
 {
     int tempDisplay = 0;
     int* m_nDisplayMoney = nullptr;
+    
+    // Tepat sebelum HUD uang digambar, kita ubah nilai DisplayMoney jadi instan!
     if (g_pPlayerInfo) {
         int* m_nMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xB8);
         m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
@@ -132,6 +153,8 @@ DECL_HOOK(void*, CWidgetPlayerInfo_Draw, void* self)
     }
     
     void* result = CWidgetPlayerInfo_Draw(self);
+    
+    // Setelah selesai digambar, kembalikan nilai animasi agar teks Money Changer tetap muncul
     if (m_nDisplayMoney) {
         *m_nDisplayMoney = tempDisplay;
     }
@@ -139,6 +162,9 @@ DECL_HOOK(void*, CWidgetPlayerInfo_Draw, void* self)
     return result;
 }
 
+// ==========================================
+// INISIALISASI MOD
+// ==========================================
 extern "C" void OnModLoad()
 {
     logger->SetTag("Money Separator");
@@ -155,10 +181,11 @@ extern "C" void OnModLoad()
             HOOK(Global_AsciiToGxtChar, sym_AsciiToGxtChar);
         }
         
+        // FIX FATAL: CFont::SetScale dikompilasi sebagai ARM murni (32-bit), TANPA + 0x1
         if (sym_SetScale) {
             HOOK(CFont_SetScale, sym_SetScale);
         } else {
-            HOOK(CFont_SetScale, pGame + 0x190E6C + 0x1); 
+            HOOK(CFont_SetScale, pGame + 0x190E6C); 
         }
         
         HOOK(CHudColours_GetRGB, pGame + 0x43AB0C + 0x1);
@@ -183,7 +210,7 @@ extern "C" void OnModLoad()
     displayMode = cfg->Bind("Mode", 1, "Configs")->GetInt();
     
     useCustomRGB = cfg->Bind("UseCustomRGB", false, "Colors")->GetBool();
-    moneyR = cfg->Bind("R_Plus", 0, "Colors")->GetInt();
-    moneyG = cfg->Bind("G_Plus", 200, "Colors")->GetInt();
-    moneyB = cfg->Bind("B_Plus", 100, "Colors")->GetInt();
+    moneyR = cfg->Bind("moneyR", 50, "Colors")->GetInt();
+    moneyG = cfg->Bind("moneyG", 255, "Colors")->GetInt();
+    moneyB = cfg->Bind("moneyB", 50, "Colors")->GetInt();
 }
