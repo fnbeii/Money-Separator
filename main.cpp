@@ -9,12 +9,6 @@ MYMODCFG(net.KillerSA.mnfy.moneyseparator, Money Separator, 2.3, KillerSA)
 std::string separator = ".";
 std::string centSeparator = ".";
 int displayMode = 1;
-bool useCustomRGB = false;
-int moneyR = 50, moneyG = 255, moneyB = 50;
-
-struct CRGBA {
-    uint8_t r, g, b, a;
-};
 
 void* g_pPlayerInfo = nullptr;
 
@@ -90,19 +84,8 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
     }
 
     if (g_pPlayerInfo) {
-    	int* m_nMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xB8);
-    	int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
-    	*m_nDisplayMoney = *m_nMoney;
-	}
-}
-
-DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t alpha)
-{
-    CHudColours_GetRGB(out, self, colorIndex, alpha);
-    if (useCustomRGB && colorIndex == 1) {        
-        out->r = moneyR;
-        out->g = moneyG;
-        out->b = moneyB;
+        int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
+        *m_nDisplayMoney = 0; 
     }
 }
 
@@ -122,13 +105,12 @@ extern "C" void OnModLoad()
     logger->SetTag("Money Separator");
     cfg->Bind("Author", "", "About")->SetString("KillerSA"); cfg->ClearLast();
     cfg->Bind("GitHub", "", "About")->SetString("https://github.com/KillerSAA/Money-Separator/tree/main"); cfg->ClearLast();
-	cfg->Bind("Re-Edit", "", "About")->SetString("mnfy"); cfg->ClearLast();
+    cfg->Bind("Re-Edit", "", "About")->SetString("mnfy"); cfg->ClearLast();
     
     uintptr_t pGame = aml->GetLib("libGTASA.so");
     if(pGame)
     {
         HOOKBLX(Money_AsciiToGxtChar, pGame + BYBIT(0x2BD26E + 0x1, 0x37D4C4));
-        HOOK(CHudColours_GetRGB, pGame + 0x43AB0C + 0x1);
         HOOK(CPlayerInfo_Process, pGame + 0x40908C + 0x1);
     }
     else
@@ -146,9 +128,4 @@ extern "C" void OnModLoad()
     }
 
     displayMode = cfg->Bind("Mode", 1, "Configs")->GetInt();
-    
-    useCustomRGB = cfg->Bind("UseCustomRGB", false, "Colors")->GetBool();
-    moneyR = cfg->Bind("moneyR", 50, "Colors")->GetInt();
-    moneyG = cfg->Bind("moneyG", 255, "Colors")->GetInt();
-    moneyB = cfg->Bind("moneyB", 50, "Colors")->GetInt();
 }
