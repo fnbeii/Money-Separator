@@ -90,9 +90,10 @@ DECL_HOOKv(Money_AsciiToGxtChar, const char* aSource, unsigned short* aTarget)
     }
 
     if (g_pPlayerInfo) {
-        int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
-        *m_nDisplayMoney = 0; 
-    }
+    	int* m_nMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xB8);
+    	int* m_nDisplayMoney = (int*)((uintptr_t)g_pPlayerInfo + 0xBC);
+    	*m_nDisplayMoney = *m_nMoney;
+	}
 }
 
 DECL_HOOKv(CHudColours_GetRGB, CRGBA* out, void* self, int colorIndex, uint8_t alpha)
